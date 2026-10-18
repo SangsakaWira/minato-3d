@@ -1,1 +1,215 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Minato — A quiet coastal village</title><meta name="description" content="Diorama 3D interaktif desa pesisir Jepang yang tenang."><style>*{box-sizing:border-box}body{margin:0;background:#d8e9e5;color:#244b4a;font-family:system-ui,sans-serif}canvas{display:block}header{position:absolute;left:32px;top:28px;pointer-events:none}small{letter-spacing:3px;font-size:10px}h1{font-family:Georgia,serif;font-weight:400;letter-spacing:9px;margin:6px 0;font-size:38px}p{font-size:12px;opacity:.75}.controls{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:#ffffffd9;padding:8px;border-radius:30px;box-shadow:0 8px 40px #244b4a15;white-space:nowrap}button{border:0;background:transparent;color:#244b4a;padding:12px 16px;border-radius:25px;cursor:pointer}button:hover,button[aria-pressed=true]{background:#244b4a;color:white}#status{position:absolute;right:24px;top:25px;font-size:12px;max-width:260px}#hint{position:absolute;bottom:92px;width:100%;text-align:center;font-size:11px;pointer-events:none}@media(max-width:600px){header{left:20px;top:20px}h1{font-size:28px}.controls{bottom:20px;gap:0}button{padding:12px 10px;font-size:11px}#status{top:auto;bottom:120px;right:20px}}</style><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script></head><body><header><small>A LITTLE PLACE BY THE SEA</small><h1>MINATO</h1><p>Desa kecil · Laut tenang · Waktu melambat</p></header><div id="status">Memuat desa…</div><div id="hint">Geser untuk memutar · Scroll untuk zoom · Dua jari untuk menggeser</div><nav class="controls" aria-label="Kontrol peta"><button id="orbit" aria-pressed="false">Putar otomatis</button><button id="top">Peta atas</button><button id="home">Reset</button><button id="export">Unduh GLB</button></nav><script type="module" src="./main.js"></script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Minato — A quiet coastal village</title>
+<meta name="description" content="Game santai di desa pesisir Jepang: memancing, berkebun, dan berteman dengan warga.">
+<style>
+  :root { --ink: #244b4a; --paper: #fffaf0; --paper-a: #fffaf0e8; --accent: #e07a5f; --leaf: #6f9a55; --line: #244b4a1f; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; overflow: hidden; background: #d8e9e5; color: var(--ink); font-family: system-ui, sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
+  canvas { display: block; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  kbd { display: inline-block; min-width: 1.5em; padding: 0 .35em; border-radius: 5px; background: #244b4a14; font: 600 11px/1.6 system-ui, sans-serif; text-align: center; }
+  [hidden] { display: none !important; }
+
+  /* Title */
+  #title { position: fixed; inset: 0; display: flex; align-items: flex-start; padding: 28px 32px; transition: opacity .8s; z-index: 30; }
+  #title.gone { opacity: 0; pointer-events: none; }
+  .title-card small { letter-spacing: 3px; font-size: 10px; }
+  .title-card h1 { font-family: Georgia, serif; font-weight: 400; letter-spacing: 9px; margin: 6px 0; font-size: 44px; }
+  .title-card p { font-size: 13px; opacity: .75; margin: 0 0 22px; }
+  .title-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .title-actions button { border: 0; border-radius: 30px; padding: 13px 24px; background: var(--ink); color: #fff; font-size: 14px; box-shadow: 0 8px 30px #244b4a30; }
+  #btnContinue:not([hidden]) + #btnNew { background: var(--paper-a); color: var(--ink); }
+  .title-help { margin-top: 22px !important; font-size: 12px !important; line-height: 1.7; max-width: 340px; }
+
+  /* HUD */
+  .card { background: var(--paper-a); border-radius: 18px; box-shadow: 0 8px 40px #244b4a18; backdrop-filter: blur(6px); }
+  .clock { position: fixed; left: 20px; top: 18px; padding: 10px 16px; }
+  #hudDay { font: 400 15px Georgia, serif; letter-spacing: 1px; }
+  .clock .meta { display: flex; gap: 12px; margin-top: 3px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .menu { position: fixed; right: 16px; top: 18px; display: flex; gap: 6px; }
+  .menu button { border: 0; background: var(--paper-a); border-radius: 30px; padding: 10px 14px; box-shadow: 0 8px 30px #244b4a18; font-size: 14px; }
+  .menu button span { margin-left: 6px; font-size: 13px; }
+  .menu button:hover { background: #fff; }
+  #hotbar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; }
+  .slot { position: relative; width: 66px; height: 62px; border: 2px solid transparent; border-radius: 14px; background: #ffffffa8; display: grid; place-items: center; padding: 6px 2px 4px; }
+  .slot.on { border-color: var(--leaf); background: #fff; }
+  .slot kbd { position: absolute; left: 4px; top: 4px; font-size: 9px; min-width: 1.3em; }
+  .slot .ic { font-size: 20px; line-height: 1; }
+  .slot small { font-size: 10px; }
+  .slot b { position: absolute; right: 6px; top: 4px; font-size: 11px; }
+  #action { position: fixed; right: 20px; bottom: 22px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 40px; padding: 15px 22px; background: var(--ink); color: #fff; font-size: 15px; box-shadow: 0 10px 30px #244b4a40; animation: pop .2s ease-out; }
+  #action kbd { background: #ffffff26; color: #fff; }
+  #action.disabled { background: var(--paper-a); color: #244b4aa0; box-shadow: 0 8px 30px #244b4a18; cursor: default; }
+  #action.disabled kbd { display: none; }
+  @keyframes pop { from { transform: scale(.9); opacity: 0; } }
+
+  /* Labels */
+  #tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag, #bubble { position: absolute; left: 0; top: 0; pointer-events: none; text-align: center; white-space: nowrap; }
+  .tag b { display: block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #fffaf0cc; }
+  .tag i { display: block; font: 700 18px/1 Georgia, serif; font-style: normal; color: var(--accent); height: 18px; text-shadow: 0 1px 0 #fff; }
+  .tag.mark i { animation: bob 1.2s ease-in-out infinite; }
+  #bubble { font: 700 30px Georgia, serif; color: var(--accent); text-shadow: 0 2px 0 #fff; animation: bob .3s ease-in-out infinite; }
+  @keyframes bob { 50% { translate: 0 -4px; } }
+
+  #toasts { position: fixed; top: 86px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; pointer-events: none; z-index: 20; }
+  .toast { background: var(--paper-a); padding: 9px 16px; border-radius: 20px; font-size: 13px; box-shadow: 0 8px 30px #244b4a20; animation: pop .25s ease-out; transition: opacity .5s, transform .5s; }
+  .toast span { margin-right: 8px; }
+  .toast.out { opacity: 0; transform: translateY(-6px); }
+  #banner { position: fixed; top: 30%; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; }
+  #banner b { display: block; font: 400 34px Georgia, serif; letter-spacing: 4px; }
+  #banner span { font-size: 14px; opacity: .8; }
+  #banner.on { animation: banner 3.6s ease-in-out; }
+  @keyframes banner { 15%, 75% { opacity: 1; } }
+
+  /* Dialog */
+  #dialog { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(640px, calc(100% - 32px)); padding: 18px 22px 16px; z-index: 15; animation: pop .2s ease-out; cursor: pointer; }
+  .dlg-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  #dlgName { font: 400 19px Georgia, serif; letter-spacing: 1px; }
+  #dlgRole { font-size: 12px; opacity: .6; }
+  #dlgHearts { margin-left: auto; color: var(--accent); letter-spacing: 2px; font-size: 13px; }
+  #dlgText { font-size: 15px; line-height: 1.6; min-height: 3.2em; margin: 0; }
+  #dlgChoices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .choice { border: 1px solid var(--line); background: #fff; border-radius: 20px; padding: 8px 14px 8px 8px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .choice:hover { border-color: var(--ink); }
+
+  /* Panel */
+  #panel { position: fixed; inset: 0; display: grid; place-items: center; background: #1d34331f; z-index: 25; padding: 16px; }
+  .sheet { width: min(460px, 100%); max-height: min(560px, 100%); display: flex; flex-direction: column; background: var(--paper); border-radius: 20px; box-shadow: 0 20px 60px #244b4a40; animation: pop .2s ease-out; }
+  .sheet header { display: flex; align-items: center; padding: 16px 20px 8px; }
+  .sheet h2 { margin: 0; font: 400 21px Georgia, serif; letter-spacing: 1px; }
+  #panelClose { margin-left: auto; border: 0; background: none; font-size: 18px; padding: 4px 8px; }
+  #panelBody { overflow: auto; padding: 4px 20px 20px; }
+  #panelBody h3 { font: 600 11px system-ui; letter-spacing: 2px; text-transform: uppercase; opacity: .6; margin: 16px 0 6px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .row .ic { font-size: 22px; width: 28px; text-align: center; }
+  .row .nm { flex: 1; font-size: 14px; }
+  .row .nm small { display: block; font-size: 11px; opacity: .65; margin-top: 2px; }
+  .btns { display: flex; gap: 4px; }
+  .btn { border: 0; background: var(--ink); color: #fff; border-radius: 16px; padding: 7px 12px; font-size: 12px; white-space: nowrap; }
+  .btn.ghost { background: #244b4a14; color: var(--ink); }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .muted { font-size: 13px; opacity: .75; line-height: 1.6; }
+  .empty { font-size: 13px; opacity: .6; padding: 10px 0; }
+  .hearts { color: var(--accent); letter-spacing: 2px; }
+  .tagok { font-size: 11px; background: var(--leaf); color: #fff; padding: 3px 8px; border-radius: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .cell { position: relative; background: #fff; border-radius: 14px; padding: 12px 6px 8px; text-align: center; }
+  .cell .ic { font-size: 26px; display: block; }
+  .cell b { position: absolute; right: 8px; top: 6px; font-size: 12px; }
+  .cell small { font-size: 11px; display: block; margin-top: 4px; }
+  .danger { margin-top: 18px; }
+
+  /* Fishing minigame */
+  #fish { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 110px; z-index: 12; touch-action: none; }
+  .fish-card { width: min(460px, calc(100% - 32px)); padding: 16px 18px; }
+  #fishHint { font-size: 12px; opacity: .75; margin: 0 0 10px; }
+  .track { position: relative; height: 42px; border-radius: 21px; background: linear-gradient(#7cc3c4, #4f9fa6); overflow: hidden; }
+  #fishZone { position: absolute; top: 4px; bottom: 4px; border-radius: 17px; background: #c8eab0b0; border: 2px solid #fffaf0; transition: background .2s; }
+  #fish.hit #fishZone { background: #9fd889d0; }
+  #fishIcon { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 24px; }
+  .meter { height: 8px; border-radius: 4px; background: #244b4a1a; margin-top: 10px; overflow: hidden; }
+  #fishFill { height: 100%; width: 30%; background: var(--leaf); transition: width .1s linear; }
+
+  #fade { position: fixed; inset: 0; display: grid; place-items: center; background: #1d2b3a; color: #fffaf0; opacity: 0; pointer-events: none; transition: opacity .8s; z-index: 40; padding: 24px; text-align: center; }
+  #fade.on { opacity: 1; pointer-events: auto; }
+  #fade p { font: 400 18px Georgia, serif; letter-spacing: 1px; max-width: 420px; line-height: 1.6; }
+
+  @media (max-width: 640px) {
+    #title { padding: 22px 20px; }
+    .title-card h1 { font-size: 32px; }
+    .clock { left: 12px; top: 12px; padding: 8px 12px; }
+    #hudDay { font-size: 13px; }
+    .menu { right: 12px; top: 12px; gap: 4px; }
+    .menu button { padding: 9px 11px; }
+    .menu button span { display: none; }
+    #hotbar { left: 12px; transform: none; bottom: 14px; padding: 0; }
+    .slot { width: 54px; height: 56px; }
+    .slot kbd { display: none; }
+    #action { right: 12px; bottom: 16px; padding: 16px 18px; font-size: 14px; }
+    #action kbd { display: none; }
+    #dialog { bottom: 12px; padding: 14px 16px; }
+    #dlgText { font-size: 14px; }
+    #fish { padding-bottom: 96px; }
+    .choice kbd { display: none; }
+    .choice { padding: 9px 14px; }
+  }
+  @media (hover: none) { .title-help .keys { display: none; } }
+  @media (hover: hover) { .title-help .touch { display: none; } }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="title">
+  <div class="title-card">
+    <small>A LITTLE PLACE BY THE SEA</small>
+    <h1>MINATO</h1>
+    <p>Desa kecil · Laut tenang · Waktu melambat</p>
+    <p id="loading">Memuat desa…</p>
+    <div class="title-actions" id="titleActions" hidden>
+      <button id="btnContinue" hidden>Lanjutkan</button>
+      <button id="btnNew">Mulai baru</button>
+    </div>
+    <p class="title-help">
+      Pancing ikan di dermaga, rawat kebun kecil, dan kenali warga desa.<br>
+      <span class="keys"><kbd>WASD</kbd> / klik untuk jalan · <kbd>E</kbd> aksi · seret untuk memutar kamera</span>
+      <span class="touch">Ketuk tanah untuk jalan · geser untuk memutar kamera · tombol kanan bawah untuk aksi</span>
+    </p>
+  </div>
+</div>
+
+<div id="hud" hidden>
+  <div class="card clock">
+    <div id="hudDay"></div>
+    <div class="meta"><span id="hudTime"></span><span id="hudWeather"></span><span id="hudCoins"></span></div>
+  </div>
+  <nav class="menu" aria-label="Menu">
+    <button id="btnBag" title="Tas (I)">🎒<span>Tas</span></button>
+    <button id="btnNotes" title="Catatan (Q)">📜<span>Catatan</span></button>
+    <button id="btnMute" title="Suara (M)" aria-label="Suara">🔊</button>
+  </nav>
+  <div id="hotbar"></div>
+  <button id="action" hidden><kbd>E</kbd><span id="actionLabel"></span></button>
+</div>
+
+<div id="tags"><div id="bubble"></div></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="banner"><b></b><span></span></div>
+
+<div id="dialog" class="card" hidden>
+  <div class="dlg-head"><span id="dlgName"></span><span id="dlgRole"></span><span id="dlgHearts"></span></div>
+  <p id="dlgText"></p>
+  <div id="dlgChoices"></div>
+</div>
+
+<div id="panel" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="panelTitle">
+    <header><h2 id="panelTitle"></h2><button id="panelClose" aria-label="Tutup">✕</button></header>
+    <div id="panelBody"></div>
+  </div>
+</div>
+
+<div id="fish" hidden>
+  <div class="fish-card card">
+    <p id="fishHint"></p>
+    <div class="track"><div id="fishZone"></div><div id="fishIcon">🐟</div></div>
+    <div class="meter"><div id="fishFill"></div></div>
+  </div>
+</div>
+
+<div id="fade"><p></p></div>
+
+<script>
+  // If the module or CDN fails, say so instead of loading forever.
+  setTimeout(function () {
+    if (!window.__minatoReady) document.getElementById('loading').textContent = 'Tidak dapat memuat 3D. Periksa koneksi internet dan dukungan WebGL, lalu muat ulang.';
+  }, 12000);
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
